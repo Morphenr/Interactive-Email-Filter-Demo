@@ -75,11 +75,11 @@ def main():
     show_details = st.sidebar.checkbox("Show advanced details")
 
     # ----- MAIN PAGE -----
-    st.title("Fun Interactive Email Filtering Demo")
+    st.title("Interactive Email Filtering")
 
     st.markdown("""
-    Welcome to this **interactive demo**! Below, you'll find a set of emails—some
-    genuine, some spam—each with a **'Genuineness Score'** from our detection model.
+    Welcome to this **interactive demo**! Below, you'll find a set of emails — some
+    genuine, some spam—each with a **'Genuineness Score'** from the spam detection model.
     
     **1.** Drag the **slider** to set a threshold for delivery.  
     **2.** Emails with scores **below** this threshold are **Blocked** (treated as spam).  
@@ -289,8 +289,8 @@ def main():
             title="ROC Curve",
             xaxis_title="False Positive Rate (FPR)",
             yaxis_title="True Positive Rate (TPR)",
-            margin=dict(l=70, r=30, t=60, b=50),
-
+            margin=dict(l=20, r=0, t=0, b=20),
+            showlegend=False,
             # Force a square figure
             width=500,
             height=500
