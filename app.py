@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 
 # Extended Synthetic Data with "genuine_score" 
-# (including ambiguous records: genuine with low scores, spam with high scores, etc.)
 EMAILS = [
     # High-spam-likelihood / Low genuineness
     {"subject": "Claim your prize now! Limited offer!",   "genuine_score": 0.05, "is_spam": True},
@@ -29,7 +28,7 @@ EMAILS = [
     # High genuineness but spam (a sneaky spam)
     {"subject": "Your account is secure! (But confirm here)",      "genuine_score": 0.8,  "is_spam": True},
 
-    # Genuine with reasonably high genuineness
+    # Genuine with higher genuineness
     {"subject": "Meeting agenda for Monday",           "genuine_score": 0.9,  "is_spam": False},
     {"subject": "Reminder: Project deadline",          "genuine_score": 0.85, "is_spam": False},
     {"subject": "Weekly newsletter: Productivity tips","genuine_score": 0.75, "is_spam": False},
@@ -40,37 +39,52 @@ EMAILS = [
 ]
 
 def main():
-    # Inject custom CSS for fade-in animations
+    # Inject custom CSS for fade-in animations and smaller card styles
     st.markdown("""
     <style>
     .fade-in {
       animation: fadeIn 0.4s ease-in;
     }
     @keyframes fadeIn {
-      0%   {opacity: 0; transform: translateY(5px);}
+      0%   {opacity: 0; transform: translateY(4px);}
       100% {opacity: 1; transform: translateY(0);}
+    }
+    /* Make each card smaller */
+    .email-card {
+      border: 1px solid #ccc; 
+      border-radius: 3px; 
+      padding: 4px 6px; 
+      margin-bottom: 4px; 
+      font-size: 0.9rem; 
+      line-height: 1.2rem;
     }
     </style>
     """, unsafe_allow_html=True)
 
+    # ========== SIDEBAR =============
+    st.sidebar.title("KPIs & Settings")
+    
+    # Checkbox for advanced details
+    show_details = st.sidebar.checkbox("Show advanced details", value=False)
+
+    # We'll store some metrics in the sidebar
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### Additional KPIs")
+
+    # ========== MAIN PAGE ===========
     st.title("Interactive Email Filter Demo (Genuineness Threshold)")
 
-    # === Sidebar Configuration ===
-    st.sidebar.title("Filter Settings")
-    
-    # A subdued toggle for showing advanced details in the sidebar
-    show_details = st.sidebar.checkbox("Show advanced details", value=False)
-    
-    # Slider in the sidebar
-    threshold = st.sidebar.slider(
+    # Slider in main view for better mobile experience
+    threshold = st.slider(
         label="Minimum Genuineness Score",
         min_value=0.0,
         max_value=1.0,
         value=0.0,
-        step=0.05
+        step=0.05,
+        help="Any email with a genuineness score below this threshold is blocked."
     )
 
-    # Turn dataset into DataFrame
+    # Convert dataset to DataFrame
     df = pd.DataFrame(EMAILS)
 
     # Predict 'delivered' if genuine_score >= threshold
@@ -80,12 +94,13 @@ def main():
     delivered_df = df[df["predicted_genuine"]]
     blocked_df = df[~df["predicted_genuine"]]
 
+    # Basic counts
     total_emails = len(df)
     emails_delivered = len(delivered_df)
     emails_blocked = len(blocked_df)
 
     # Count how many are actually spam vs genuine
-    total_spam = sum(df["is_spam"])
+    total_spam = df["is_spam"].sum()
     total_genuine = total_emails - total_spam
 
     # Spam that got delivered
@@ -97,30 +112,22 @@ def main():
     # Genuine that got blocked
     genuine_blocked = emails_blocked - spam_blocked
 
-    # === KPI Display in Sidebar ===
-    st.sidebar.markdown("### Key Performance Indicators")
-    st.sidebar.metric(label="Emails Delivered", value=f"{emails_delivered} / {total_emails}")
+    # Show some metrics in the sidebar
+    st.sidebar.metric(label="Emails Delivered", value=f"{emails_delivered}/{total_emails}")
+    st.sidebar.metric(label="Spam Delivered", value=f"{spam_delivered}/{total_spam}" if total_spam else "0")
+    st.sidebar.metric(label="Genuine Delivered", value=f"{genuine_delivered}/{total_genuine}" if total_genuine else "0")
     st.sidebar.metric(label="Total Spam Emails", value=str(total_spam))
     st.sidebar.metric(label="Total Genuine Emails", value=str(total_genuine))
-    st.sidebar.metric(
-        label="Spam Delivered",
-        value=f"{spam_delivered} / {total_spam}" if total_spam else "0"
-    )
-    st.sidebar.metric(
-        label="Spam Blocked",
-        value=f"{spam_blocked} / {total_spam}" if total_spam else "0"
-    )
-    st.sidebar.metric(
-        label="Genuine Delivered",
-        value=f"{genuine_delivered} / {total_genuine}" if total_genuine else "0"
-    )
-    st.sidebar.metric(
-        label="Genuine Blocked",
-        value=f"{genuine_blocked} / {total_genuine}" if total_genuine else "0"
-    )
 
-    # === Main Section: Delivered + Blocked Emails ===
-    # Delivered
+    # KPIs to remain in main view
+    st.markdown("### Key Performance Indicators")
+    col1, col2 = st.columns(2)
+    col1.metric("Spam Blocked", f"{spam_blocked}/{total_spam}" if total_spam else "0")
+    col2.metric("Genuine Blocked", f"{genuine_blocked}/{total_genuine}" if total_genuine else "0")
+
+    st.markdown("---")
+
+    # =========== Delivered Emails ===========
     st.markdown("## Delivered Emails")
     if emails_delivered == 0:
         st.info("No emails are delivered at this threshold.")
@@ -130,25 +137,22 @@ def main():
             is_spam = row["is_spam"]
             genuine_score = row["genuine_score"]
 
-            # Subtle highlight if it's actually spam
-            bg_color = "#f8d7da" if is_spam else "#ffffff"
+            # Only show red if advanced details are ON and it's spam
+            if is_spam and show_details:
+                bg_color = "#f8d7da"
+            else:
+                bg_color = "#ffffff"
 
             # Show details if user opts in
             detail_text = ""
             if show_details:
-                # Show genuineness score as e.g. "55%"
                 score_pct = f"{genuine_score*100:.0f}%"
                 truth_label = "Spam" if is_spam else "Genuine"
                 detail_text = f"<br/><em>Genuineness score: {score_pct}, Ground truth: {truth_label}</em>"
 
             st.markdown(
                 f"""
-                <div class="fade-in" style="
-                    border:1px solid #ccc; 
-                    border-radius:3px; 
-                    padding:8px; 
-                    margin-bottom:5px; 
-                    background-color:{bg_color};">
+                <div class="fade-in email-card" style="background-color:{bg_color};">
                     <strong>📧 Subject:</strong> {subject}
                     {detail_text}
                 </div>
@@ -158,7 +162,7 @@ def main():
 
     st.markdown("---")
 
-    # Blocked
+    # =========== Blocked Emails ===========
     st.markdown("## Blocked Emails")
     if emails_blocked == 0:
         st.info("No emails are blocked at this threshold.")
@@ -168,7 +172,11 @@ def main():
             is_spam = row["is_spam"]
             genuine_score = row["genuine_score"]
 
-            bg_color = "#f8d7da" if is_spam else "#ffffff"
+            # Only show red if advanced details are ON and it's spam
+            if is_spam and show_details:
+                bg_color = "#f8d7da"
+            else:
+                bg_color = "#ffffff"
 
             detail_text = ""
             if show_details:
@@ -178,12 +186,7 @@ def main():
 
             st.markdown(
                 f"""
-                <div class="fade-in" style="
-                    border:1px solid #ccc; 
-                    border-radius:3px; 
-                    padding:8px; 
-                    margin-bottom:5px; 
-                    background-color:{bg_color};">
+                <div class="fade-in email-card" style="background-color:{bg_color};">
                     <strong>📧 Subject:</strong> {subject}
                     {detail_text}
                 </div>
