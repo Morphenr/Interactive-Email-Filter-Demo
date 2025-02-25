@@ -58,6 +58,12 @@ def main():
       font-size: 0.9rem; 
       line-height: 1.2rem;
     }
+    /* Adjust the width of the slider */
+    div[data-baseweb="slider"] {
+        width: 80% !important;  /* Adjust percentage to desired width */
+        margin-left: auto;
+        margin-right: auto;
+    }
     </style>
     """, unsafe_allow_html=True)
 
