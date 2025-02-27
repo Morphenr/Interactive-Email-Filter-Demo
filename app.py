@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 
 import plotly.graph_objects as go
+import plotly.figure_factory as ff
 from sklearn.metrics import confusion_matrix, roc_curve, auc
 
 # Extended synthetic data with "genuine_score"
@@ -193,30 +194,31 @@ def main():
             )
 
     # ----- Confusion Matrix & ROC Curve (Plotly) -----
+    # ----- Confusion Matrix & ROC Curve (Plotly) -----
     if show_details:
         st.markdown("---")
-        st.subheader("Advanced Visuals")
+        st.subheader("Advanced Model Performance Visualizations")
 
+        # Confusion Matrix Explanation
         st.markdown("""
-        Here you can see how the **model** is performing behind the scenes:
-        
-        **Confusion Matrix**  
-        - Rows: The *actual* label of the email (Genuine or Spam).  
-        - Columns: The *predicted* label (Genuine or Spam).  
-        - A perfect filter would put all spam in the “Spam” column and all genuine emails in the “Genuine” column.  
+        ### 🔍 Confusion Matrix
+        The confusion matrix helps visualize how well the model classifies emails as **Spam** or **Genuine**.
+    
+        **How to read it:**  
+        - **Rows** represent the *actual* email labels (True class).  
+        - **Columns** represent the *model's predictions*.  
+        - A perfect model would classify all spam as "Spam" and all genuine emails as "Genuine".  
 
-        **ROC Curve**  
-        - Shows how well the model can separate spam from genuine over *all possible* thresholds.  
-        - The higher the curve, the better!  
-        - We highlight your **currently selected threshold** (the red "O") on this curve.
+        🔵 **Correct classifications** (diagonal elements) → Good model performance  
+        🔴 **Misclassifications** (off-diagonal elements) → Errors in classification  
         """)
 
-        # Prepare data for confusion matrix
-        y_true = df["is_spam"].astype(int)            # 1=Spam, 0=Genuine
+        # Compute Confusion Matrix
+        y_true = df["is_spam"].astype(int)  # 1=Spam, 0=Genuine
         y_pred_spam = (~df["predicted_genuine"]).astype(int)
         cm = confusion_matrix(y_true, y_pred_spam)
 
-        # Plotly confusion matrix as a square
+        # Plot Confusion Matrix
         labels_x = ["Genuine", "Spam"]
         labels_y = ["Genuine", "Spam"]
 
@@ -237,17 +239,27 @@ def main():
             margin=dict(l=70, r=30, t=60, b=50),
             xaxis=dict(title="Model Prediction"),
             yaxis=dict(title="Actual Label", autorange="reversed"),
-
-            # Force a square figure
             width=500,
             height=500
         )
-        # Make the axes keep a 1:1 aspect ratio
         fig_cm.update_yaxes(scaleanchor="x", scaleratio=1)
 
         st.plotly_chart(fig_cm, use_container_width=False)
 
-        # ROC curve with current threshold
+        # ROC Curve Explanation
+        st.markdown("""
+        ### 📈 ROC Curve
+        The **Receiver Operating Characteristic (ROC) curve** shows how well the model differentiates between spam and genuine emails.
+
+        **How to interpret it:**  
+        - **X-axis**: False Positive Rate (FPR) → Mistakenly classifying a genuine email as spam  
+        - **Y-axis**: True Positive Rate (TPR) → Correctly identifying spam emails  
+        - A model with a high curve is better at distinguishing spam from genuine emails.  
+
+        🔴 **Your selected threshold** is marked in red to show its impact.  
+        """)
+
+        # Compute ROC Curve
         spam_probability = 1 - df["genuine_score"]  # Probability that an email is spam
         fpr, tpr, thresholds = roc_curve(y_true, spam_probability)
         roc_auc = auc(fpr, tpr)
@@ -262,8 +274,8 @@ def main():
         tpr_current = tp / (tp + fn) if (tp + fn) > 0 else 0
         fpr_current = fp / (fp + tn) if (fp + tn) > 0 else 0
 
+        # Plot ROC Curve
         fig_roc = go.Figure()
-        # Main ROC line
         fig_roc.add_trace(
             go.Scatter(
                 x=fpr, y=tpr,
@@ -272,7 +284,6 @@ def main():
                 name=f"ROC curve (AUC={roc_auc:.2f})"
             )
         )
-        # Diagonal "random guess"
         fig_roc.add_trace(
             go.Scatter(
                 x=[0, 1], y=[0, 1],
@@ -281,7 +292,6 @@ def main():
                 name="Random Guess"
             )
         )
-        # Marker for CURRENT threshold
         fig_roc.add_trace(
             go.Scatter(
                 x=[fpr_current],
@@ -297,7 +307,6 @@ def main():
             yaxis_title="True Positive Rate (TPR)",
             margin=dict(l=20, r=0, t=0, b=20),
             showlegend=False,
-            # Force a square figure
             width=500,
             height=500
         )
@@ -305,6 +314,51 @@ def main():
         fig_roc.update_yaxes(showgrid=False, scaleanchor="x", scaleratio=1)
 
         st.plotly_chart(fig_roc, use_container_width=False)
+
+        # Score Distribution Explanation
+        st.markdown("""
+        ### 📊 Distribution of Model Scores
+        This plot shows how the model scores different emails based on their likelihood of being genuine.
+
+        **What to look for:**  
+        - The **blue curve** represents genuine emails.  
+        - The **orange curve** represents spam emails.  
+        - The **red vertical line** is your current classification threshold.  
+
+        A well-separated distribution means the model is effectively distinguishing spam from genuine emails.
+        """)
+
+        # Compute Score Distributions
+        genuine_scores = df[df["is_spam"] == False]["genuine_score"]
+        spam_scores = df[df["is_spam"] == True]["genuine_score"]
+
+        # Plot Score Distributions
+        fig_dist = ff.create_distplot(
+            [genuine_scores, spam_scores],
+            ["Genuine Emails", "Spam Emails"],
+            show_hist=True,
+            show_rug=False,
+            bin_size=0.05,
+            curve_type='normal'
+        )
+        fig_dist.add_vline(
+            x=threshold,
+            line=dict(color="red", width=2),
+            annotation_text="Threshold",
+            annotation_position="top left"
+        )
+
+        fig_dist.update_layout(
+            title="Distribution of Model Scores",
+            xaxis_title="Genuineness Score",
+            yaxis_title="Density",
+            legend_title="Email Type"
+        )
+        fig_dist.update_xaxes(showgrid=False)
+        fig_dist.update_yaxes(showgrid=False)
+
+        st.plotly_chart(fig_dist, use_container_width=True)
+
 
 
 if __name__ == "__main__":
